@@ -16,453 +16,611 @@ ________________________________________
 Sales Management System
 Course: Database Programming
 Assignment: Advanced SQL Programming – Common Table Expressions (CTEs) and Window Functions
+ALPHA MALT MIS
 ________________________________________
-Table of Contents
-1.	Business Scenario
-2.	Business Problem
-3.	Database Design
-4.	Database Schema
-5.	ER Diagram
-6.	Sample Data
-7.	Part A – Common Table Expressions (CTEs)
-8.	Part B – SQL Window Functions
-9.	Analysis and Findings
-10.	References
-11.	Academic Integrity Statement
+creation of tables
+
+DECLARE
+ message varchar2(100):= 'group assignment on sales mis using pl/sql'; 
+BEGIN 
+ dbms_output.put_line(message); 
+
+creation of tables
+
+ SET SERVEROUTPUT ON;
+ 
+ CREATE TABLE employees (
+   employee_id NUMBER PRIMARY KEY,  --primay key--
+   employee_name VARCHAR2(100) NOT NULL,
+   
+ );
+ 
+ CREATE TABLE customers (
+   customer_id NUMBER PRIMARY KEY,--primay key--
+   customer_name VARCHAR2(100) NOT NULL,
+   city VARCHAR2(50),
+   segment VARCHAR2(30)
+ );
+ 
+ CREATE TABLE orders (
+   order_id NUMBER PRIMARY KEY, --primay key--
+   customer_id NUMBER NOT NULL,
+   employee_id NUMBER NOT NULL,
+   order_date DATE NOT NULL,
+   status VARCHAR2(20),
+   CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),    --forign key--
+   CONSTRAINT fk_orders_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id)     --forign key--
+ );
+ 
+ CREATE TABLE order_items (
+   order_item_id NUMBER PRIMARY KEY,     --primay key--
+   order_id NUMBER NOT NULL,
+   product_name VARCHAR2(100) NOT NULL,
+   category VARCHAR2(50),
+   quantity NUMBER NOT NULL,
+   unit_price NUMBER(10,2) NOT NULL,
+   CONSTRAINT fk_items_order FOREIGN KEY (order_id) REFERENCES orders(order_id) --forign key--
+ );
+ 
+ INSERT INTO employees VALUES (1, 'Asha Khan', NULL);
+ INSERT INTO employees VALUES (2, 'Brian Lee', 1);
+ INSERT INTO employees VALUES (3, 'Carla Gomez', 1);
+ INSERT INTO employees VALUES (4, 'Dinesh Patel', 2);
+ 
+ INSERT INTO customers VALUES (101, 'Alpha Mart', 'New York', 'Retail');
+ INSERT INTO customers VALUES (102, 'Bright Store', 'Chicago', 'Retail');
+ INSERT INTO customers VALUES (103, 'Central Cafe', 'Dallas', 'Hospitality');
+ INSERT INTO customers VALUES (104, 'Delta Clinic', 'Miami', 'Healthcare');
+ 
+ INSERT INTO orders VALUES (1001, 101, 2, DATE '2024-01-05', 'Completed');
+ INSERT INTO orders VALUES (1002, 102, 2, DATE '2024-01-10', 'Completed');
+ INSERT INTO orders VALUES (1003, 103, 3, DATE '2024-01-12', 'Completed');
+ INSERT INTO orders VALUES (1004, 104, 4, DATE '2024-01-15', 'Pending');
+ INSERT INTO orders VALUES (1005, 101, 3, DATE '2024-01-18', 'Completed');
+ INSERT INTO orders VALUES (1006, 102, 4, DATE '2024-01-20', 'Completed');
+ 
+ INSERT INTO order_items VALUES (1, 1001, 'Laptop', 'Electronics', 2, 850);
+ INSERT INTO order_items VALUES (2, 1001, 'Mouse', 'Accessories', 5, 25);
+ INSERT INTO order_items VALUES (3, 1002, 'Monitor', 'Electronics', 3, 220);
+ INSERT INTO order_items VALUES (4, 1003, 'Chair', 'Furniture', 10, 75);
+ INSERT INTO order_items VALUES (5, 1004, 'Desk', 'Furniture', 4, 180);
+ INSERT INTO order_items VALUES (6, 1005, 'Keyboard', 'Accessories', 6, 45);
+ INSERT INTO order_items VALUES (7, 1006, 'Printer', 'Electronics', 1, 300);
+ 
+ COMMIT;
+ 
+ PART A: CTEs 
+ -- 1) Simple CTE
+ WITH customer_sales AS (
+   SELECT c.customer_name, SUM(oi.quantity * oi.unit_price) AS total_sales
+   FROM customers c
+   JOIN orders o ON c.customer_id = o.customer_id
+   JOIN order_items oi ON o.order_id = oi.order_id
+   GROUP BY c.customer_name
+ )
+ SELECT * FROM customer_sales
+ ORDER BY total_sales DESC;
+ 
+ 
+
+
+ -- 2) Multiple CTEs
+ WITH order_totals AS (
+   SELECT o.order_id, o.employee_id, SUM(oi.quantity * oi.unit_price) AS order_total
+   FROM orders o
+   JOIN order_items oi ON o.order_id = oi.order_id
+   GROUP BY o.order_id, o.employee_id
+ ),
+ employee_sales AS (
+   SELECT e.employee_name, SUM(ot.order_total) AS total_sales
+   FROM employees e
+   JOIN order_totals ot ON e.employee_id = ot.employee_id
+   GROUP BY e.employee_name
+ )
+ SELECT * FROM employee_sales
+ ORDER BY total_sales DESC;
+ 
+ 
+ 
+ -- 3) Recursive CTE
+ WITH org_chart (employee_id, employee_name, manager_id, lvl) AS (
+   SELECT employee_id, employee_name, manager_id, 1
+   FROM employees
+   WHERE manager_id IS NULL
+   UNION ALL
+   SELECT e.employee_id, e.employee_name, e.manager_id, oc.lvl   1
+   FROM employees e
+   JOIN org_chart oc ON e.manager_id = oc.employee_id
+ )
+ SELECT * FROM org_chart
+ ORDER BY lvl, employee_id;
+ 
+ 
+ 
+ -- 4) CTE with Aggregation
+ WITH category_sales AS (
+   SELECT oi.category, SUM(oi.quantity * oi.unit_price) AS category_total
+   FROM order_items oi
+   GROUP BY oi.category
+ )
+ SELECT category, category_total,
+        ROUND(100 * category_total / SUM(category_total) OVER (), 2) AS pct_of_total
+ FROM category_sales
+ ORDER BY category_total DESC;
+ 
+ 
+ -- 5) CTE with JOIN
+ WITH pending_orders AS (
+   SELECT order_id, customer_id, employee_id, order_date
+   FROM orders
+   WHERE status = 'Pending'
+ )
+ SELECT p.order_id, c.customer_name, e.employee_name, p.order_date
+ FROM pending_orders p
+ JOIN customers c ON p.customer_id = c.customer_id
+ JOIN employees e ON p.employee_id = e.employee_id;
+ 
+ 
+ 
+  PART B: Window Functions 
+ 
+ -- 1) ROW_NUMBER()
+ SELECT c.customer_name,
+        SUM(oi.quantity * oi.unit_price) AS total_sales,
+        ROW_NUMBER() OVER (ORDER BY SUM(oi.quantity * oi.unit_price) DESC) AS row_num
+ FROM customers c
+ JOIN orders o ON c.customer_id = o.customer_id
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY c.customer_name
+ ORDER BY total_sales DESC;
+ 
+ -- 2) RANK()
+ SELECT e.employee_name,
+        SUM(oi.quantity * oi.unit_price) AS total_sales,
+        RANK() OVER (ORDER BY SUM(oi.quantity * oi.unit_price) DESC) AS rank_num
+ FROM employees e
+ JOIN orders o ON e.employee_id = o.employee_id
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY e.employee_name
+ ORDER BY total_sales DESC;
+ 
+ -- 3) DENSE_RANK()
+ SELECT c.city,
+        SUM(oi.quantity * oi.unit_price) AS total_sales,
+        DENSE_RANK() OVER (ORDER BY SUM(oi.quantity * oi.unit_price) DESC) AS dense_rank_num
+ FROM customers c
+ JOIN orders o ON c.customer_id = o.customer_id
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY c.city
+ ORDER BY total_sales DESC;
+ 
+ -- 4) PERCENT_RANK()
+ SELECT oi.category,
+        SUM(oi.quantity * oi.unit_price) AS total_sales,
+        PERCENT_RANK() OVER (ORDER BY SUM(oi.quantity * oi.unit_price)) AS percent_rank_val
+ FROM order_items oi
+ GROUP BY oi.category
+ ORDER BY total_sales;
+ 
+ -- 5) SUM() OVER()
+ SELECT o.order_id,
+        o.order_date,
+        SUM(oi.quantity * oi.unit_price) AS order_total,
+        SUM(SUM(oi.quantity * oi.unit_price)) OVER (ORDER BY o.order_date) AS running_total
+ FROM orders o
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY o.order_id, o.order_date
+ ORDER BY o.order_date;
+ 
+ -- 6) AVG() OVER()
+ SELECT o.order_id,
+        SUM(oi.quantity * oi.unit_price) AS order_total,
+        AVG(SUM(oi.quantity * oi.unit_price)) OVER () AS avg_order_value
+ FROM orders o
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY o.order_id
+ ORDER BY o.order_id;
+ 
+ -- 7) MIN() OVER()
+ SELECT c.customer_name,
+        SUM(oi.quantity * oi.unit_price) AS total_sales,
+        MIN(SUM(oi.quantity * oi.unit_price)) OVER () AS min_sales
+ FROM customers c
+ JOIN orders o ON c.customer_id = o.customer_id
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY c.customer_name
+ ORDER BY total_sales DESC;
+ 
+ -- 8) MAX() OVER()
+ SELECT c.customer_name,
+        SUM(oi.quantity * oi.unit_price) AS total_sales,
+        MAX(SUM(oi.quantity * oi.unit_price)) OVER () AS max_sales
+ FROM customers c
+ JOIN orders o ON c.customer_id = o.customer_id
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY c.customer_name
+ ORDER BY total_sales DESC;
+ 
+ -- 9) LAG()
+ SELECT o.order_id,
+        o.order_date,
+        SUM(oi.quantity * oi.unit_price) AS order_total,
+        LAG(SUM(oi.quantity * oi.unit_price)) OVER (ORDER BY o.order_date) AS previous_order_total
+ FROM orders o
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY o.order_id, o.order_date
+ ORDER BY o.order_date;
+ 
+ -- 10) LEAD()
+ SELECT o.order_id,
+        o.order_date,
+        SUM(oi.quantity * oi.unit_price) AS order_total,
+        LEAD(SUM(oi.quantity * oi.unit_price)) OVER (ORDER BY o.order_date) AS next_order_total
+ FROM orders o
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY o.order_id, o.order_date
+ ORDER BY o.order_date;
+ 
+ -- 11) NTILE()
+ SELECT c.customer_name,
+        SUM(oi.quantity * oi.unit_price) AS total_sales,
+        NTILE(4) OVER (ORDER BY SUM(oi.quantity * oi.unit_price) DESC) AS sales_quartile
+ FROM customers c
+ JOIN orders o ON c.customer_id = o.customer_id
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY c.customer_name
+ ORDER BY total_sales DESC;
+ 
+ -- 12) CUME_DIST()
+ SELECT e.employee_name,
+        SUM(oi.quantity * oi.unit_price) AS total_sales,
+        CUME_DIST() OVER (ORDER BY SUM(oi.quantity * oi.unit_price)) AS cumulative_distribution
+ FROM employees e
+ JOIN orders o ON e.employee_id = o.employee_id
+ JOIN order_items oi ON o.order_id = oi.order_id
+ GROUP BY e.employee_name
+ ORDER BY total_sales;
+ 
 ________________________________________
-Business Scenario
-ABC Electronics is a growing retail company that sells electronic products such as laptops, printers, keyboards, and computer accessories. The company serves customers from different cities and records every sale made.
-Management wants a database system that can help them analyze customer purchases, identify top-selling products, monitor monthly sales, and improve business decision-making through advanced SQL queries.
+
+
+
+
+
+**outputs:**
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES
+-----------
+Alpha Mart
+       2095
+
+Bright Store
+	960
+
+Central Cafe
+	750
+
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES
+-----------
+Delta Clinic
+	720
+
+
+EMPLOYEE_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES
+-----------
+Brian Lee
+       2485
+
+Dinesh Patel
+       1020
+
+Carla Gomez
+       1020
+
+   SELECT e.employee_id, e.employee_name, e.manager_id, oc.lvl	 1
+                                                                 *
+ERROR at line 6:
+ORA-00923: FROM keyword not found where expected
+
+
+
+CATEGORY					   CATEGORY_TOTAL PCT_OF_TOTAL
+-------------------------------------------------- -------------- ------------
+Electronics						     2660	 58.78
+Furniture						     1470	 32.49
+Accessories						      395	  8.73
+
+  ORDER_ID
+----------
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+EMPLOYEE_NAME
+--------------------------------------------------------------------------------
+ORDER_DATE
+------------------
+      1004
+Delta Clinic
+Dinesh Patel
+15-JAN-24
+
+===== PART B: Window Functions =====
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES    ROW_NUM
+----------- ----------
+Alpha Mart
+       2095	     1
+
+Bright Store
+	960	     2
+
+Central Cafe
+	750	     3
+
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES    ROW_NUM
+----------- ----------
+Delta Clinic
+	720	     4
+
+
+EMPLOYEE_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES   RANK_NUM
+----------- ----------
+Brian Lee
+       2485	     1
+
+Dinesh Patel
+       1020	     2
+
+Carla Gomez
+       1020	     2
+
+
+CITY						   TOTAL_SALES DENSE_RANK_NUM
+-------------------------------------------------- ----------- --------------
+New York						  2095		    1
+Chicago 						   960		    2
+Dallas							   750		    3
+Miami							   720		    4
+
+CATEGORY					   TOTAL_SALES PERCENT_RANK_VAL
+-------------------------------------------------- ----------- ----------------
+Accessories						   395		      0
+Furniture						  1470		     .5
+Electronics						  2660		      1
+
+  ORDER_ID ORDER_DATE	      ORDER_TOTAL RUNNING_TOTAL
+---------- ------------------ ----------- -------------
+      1001 05-JAN-24		     1825	   1825
+      1002 10-JAN-24		      660	   2485
+      1003 12-JAN-24		      750	   3235
+      1004 15-JAN-24		      720	   3955
+      1005 18-JAN-24		      270	   4225
+      1006 20-JAN-24		      300	   4525
+
+  ORDER_ID ORDER_TOTAL AVG_ORDER_VALUE
+---------- ----------- ---------------
+      1001	  1825	    754.166667
+      1002	   660	    754.166667
+      1003	   750	    754.166667
+      1004	   720	    754.166667
+      1005	   270	    754.166667
+      1006	   300	    754.166667
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES  MIN_SALES
+----------- ----------
+Alpha Mart
+       2095	   720
+
+Bright Store
+	960	   720
+
+Central Cafe
+	750	   720
+
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES  MIN_SALES
+----------- ----------
+Delta Clinic
+	720	   720
+
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES  MAX_SALES
+----------- ----------
+Alpha Mart
+       2095	  2095
+
+Bright Store
+	960	  2095
+
+Central Cafe
+	750	  2095
+
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES  MAX_SALES
+----------- ----------
+Delta Clinic
+	720	  2095
+
+
+  ORDER_ID ORDER_DATE	      ORDER_TOTAL PREVIOUS_ORDER_TOTAL
+---------- ------------------ ----------- --------------------
+      1001 05-JAN-24		     1825
+      1002 10-JAN-24		      660		  1825
+      1003 12-JAN-24		      750		   660
+      1004 15-JAN-24		      720		   750
+      1005 18-JAN-24		      270		   720
+      1006 20-JAN-24		      300		   270
+
+  ORDER_ID ORDER_DATE	      ORDER_TOTAL NEXT_ORDER_TOTAL
+---------- ------------------ ----------- ----------------
+      1001 05-JAN-24		     1825	       660
+      1002 10-JAN-24		      660	       750
+      1003 12-JAN-24		      750	       720
+      1004 15-JAN-24		      720	       270
+      1005 18-JAN-24		      270	       300
+      1006 20-JAN-24		      300
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES SALES_QUARTILE
+----------- --------------
+Alpha Mart
+       2095		 1
+
+Bright Store
+	960		 2
+
+Central Cafe
+	750		 3
+
+
+CUSTOMER_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES SALES_QUARTILE
+----------- --------------
+Delta Clinic
+	720		 4
+
+
+EMPLOYEE_NAME
+--------------------------------------------------------------------------------
+TOTAL_SALES CUMULATIVE_DISTRIBUTION
+----------- -----------------------
+Carla Gomez
+       1020		 .666666667
+
+Dinesh Patel
+       1020		 .666666667
+
+Brian Lee
+       2485			  1
+
+
 ________________________________________
-Business Problem
-The company currently stores sales information without analytical reporting. Management cannot easily identify customer buying patterns, product performance, or monthly sales trends. This project develops a relational database that applies Common Table Expressions (CTEs) and SQL Window Functions to generate meaningful business insights.
+
+**description of values**
+
+
+Part A: CTE Business Value
+1) Simple CTE
+Business value:
+This query summarizes total sales by customer in a readable way. It helps the sales team quickly identify top customers and focus on high-value accounts.
+
+2) Multiple CTEs
+Business value:
+This query calculates order totals first and then aggregates them by employee. It supports performance analysis and helps management evaluate employee contribution to sales.
+
+3) Recursive CTE
+Business value:
+This query displays the employee hierarchy, showing managers and their reporting staff. It is useful for organizational analysis and workforce planning.
+
+4) CTE with Aggregation
+Business value:
+This query shows sales by product category and the percentage contribution of each category. It helps management understand which product groups generate the most revenue.
+
+5) CTE with JOIN
+Business value:
+This query lists pending orders with customer and employee details. It helps track unfinished business and improves order follow-up and customer service.
+
+Part B: Window Function Interpretations
+1) ROW_NUMBER()
+Interpretation:
+Assigns a unique sequential number to each customer based on total sales. It is useful for ranking without duplicate numbers.
+
+2) RANK()
+Interpretation:
+Ranks employees by sales, but ties receive the same rank and the next rank is skipped. This is useful when equal performance should be treated equally.
+
+3) DENSE_RANK()
+Interpretation:
+Ranks cities by sales with no skipped numbers between ties. It is useful for compact ranking reports.
+
+4) PERCENT_RANK()
+Interpretation:
+Shows the relative position of each category compared to the others. It helps compare performance as a percentage scale.
+
+5) SUM() OVER()
+Interpretation:
+Calculates running total sales by order date. This is useful for trend analysis and monitoring cumulative revenue.
+
+6) AVG() OVER()
+Interpretation:
+Displays the average order value across all orders. It helps measure typical sales performance.
+
+7) MIN() OVER()
+Interpretation:
+Finds the smallest customer sales value while showing all rows. It is useful for identifying the lowest-performing customer.
+
+8) MAX() OVER()
+Interpretation:
+Finds the highest customer sales value while showing all rows. It helps identify the best-performing customer.
+
+9) LAG()
+Interpretation:
+Shows the previous order’s total beside the current order. It is useful for comparing changes over time.
+
+10) LEAD()
+Interpretation:
+Shows the next order’s total beside the current order. It helps forecast upcoming values and compare future movement.
+
+11) NTILE()
+Interpretation:
+Divides customers into quartiles based on sales. It helps segment customers into performance groups.
+
+12) CUME_DIST()
+Interpretation:
+Shows the cumulative distribution of employee sales. It helps understand how each employee compares to the overall group
 ________________________________________
-Database Design
-The system consists of three related tables:
-•	Customers
-•	Products
-•	Sales
-Relationships:
-•	One customer can make many sales.
-•	One product can appear in many sales.
-•	Every sale belongs to one customer and one product.
-________________________________________
-Database Schema
-Customers Table
-CREATE TABLE Customers
-(
-    CustomerID INT PRIMARY KEY,
-    CustomerName VARCHAR(100),
-    City VARCHAR(100)
-);
-Products Table
-CREATE TABLE Products
-(
-    ProductID INT PRIMARY KEY,
-    ProductName VARCHAR(100),
-    Price DECIMAL(10,2)
-);
-Sales Table
-CREATE TABLE Sales
-(
-    SaleID INT PRIMARY KEY,
-    CustomerID INT,
-    ProductID INT,
-    Quantity INT,
-    SaleDate DATE,
+**an erd and screenshots**
+![Uploading an erd.png…]()
+<img width="1512" height="834" alt="io screnshot" src="https://github.com/user-attachments/assets/0bef83c6-ac92-4815-81e2-9c35582bc098" />
 
-    FOREIGN KEY(CustomerID)
-    REFERENCES Customers(CustomerID),
 
-    FOREIGN KEY(ProductID)
-    REFERENCES Products(ProductID)
-);
-________________________________________
-ER Diagram
-+------------------+
-|    Customers     |
-+------------------+
-| CustomerID (PK)  |
-| CustomerName     |
-| City             |
-+------------------+
-         |
-         | 1
-         |
-         | M
-+------------------+
-|      Sales       |
-+------------------+
-| SaleID (PK)      |
-| CustomerID (FK)  |
-| ProductID (FK)   |
-| Quantity         |
-| SaleDate         |
-+------------------+
-         |
-         | M
-         |
-         | 1
-+------------------+
-|     Products     |
-+------------------+
-| ProductID (PK)   |
-| ProductName      |
-| Price            |
-+------------------+
-________________________________________
-Sample Data
-Customers
-INSERT INTO Customers VALUES
-(1,'John','Kigali'),
-(2,'Alice','Musanze'),
-(3,'Brian','Huye'),
-(4,'Grace','Rubavu');
-Products
-INSERT INTO Products VALUES
-(101,'Laptop',850),
-(102,'Printer',200),
-(103,'Mouse',25),
-(104,'Keyboard',40);
-Sales
-INSERT INTO Sales VALUES
-(1,1,101,2,'2026-01-05'),
-(2,2,102,5,'2026-01-06'),
-(3,3,101,1,'2026-01-08'),
-(4,1,104,4,'2026-02-01'),
-(5,4,103,10,'2026-02-10'),
-(6,2,101,3,'2026-02-15'),
-(7,3,104,5,'2026-03-01'),
-(8,1,103,7,'2026-03-12');
-________________________________________
-Part A – Common Table Expressions (CTEs)
-1. Simple CTE
-SQL Query
--- Calculate total quantity purchased by each customer
 
-WITH CustomerSales AS
-(
-    SELECT CustomerID,
-           SUM(Quantity) AS TotalItems
-    FROM Sales
-    GROUP BY CustomerID
-)
+_________________________________________________________________________________________
+**Business Scenario Insights: Sales Management System**
 
-SELECT *
-FROM CustomerSales;
-Business Value
-This query summarizes the total quantity of products purchased by each customer. It helps management identify loyal customers and understand customer purchasing behavior.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-2. Multiple CTEs
-SQL Query
-WITH SalesAmount AS
-(
-    SELECT ProductID,
-           SUM(Quantity) AS TotalSold
-    FROM Sales
-    GROUP BY ProductID
-),
+1) Descriptive Analysis — What happened?
+Alpha Mart generated the highest customer sales at 2095, making it the top customer.
+Brian Lee was the top-performing employee with total sales of 2485.
+Electronics was the best-performing product category with total sales of 2660.
+Delta Clinic had the lowest customer sales at 720.
+The pending order was Order 1004 for Delta Clinic, handled by Dinesh Patel.
+Running totals show that sales increased steadily across the order timeline, ending at 4525.
+2) Diagnostic Analysis — Why did it happen?
+Alpha Mart ranked highest because it placed higher-value orders, including large purchases like laptops and keyboard-related sales.
+Brian Lee performed best because he handled orders with strong revenue contributions, especially from Alpha Mart and Bright Store.
+Electronics led sales because its items had high unit prices and generated larger total revenue than furniture or accessories.
+Delta Clinic ranked lowest because it had only one relatively small pending order in the dataset.
+The sales distribution suggests that revenue is concentrated in a few high-value customers and categories rather than evenly spread.
+3) Prescriptive Analysis — What actions should be taken?
+Focus sales efforts on high-value customers like Alpha Mart to increase repeat business.
+Follow up immediately on pending orders, especially Order 1004, to improve cash flow and customer satisfaction.
+Encourage employees like Dinesh Patel to improve conversion of pending deals into completed orders.
+Increase promotion of electronics products, since they are the most profitable category.
+Develop strategies to grow low-performing customers such as Delta Clinic through discounts, bundled offers, or account management.
+Use employee ranking reports to reward top performers and support lower performers with coaching.
 
-ProductValue AS
-(
-    SELECT ProductID,
-           Price
-    FROM Products
-)
-
-SELECT
-ProductValue.ProductID,
-Price,
-TotalSold,
-Price*TotalSold AS Revenue
-
-FROM ProductValue
-JOIN SalesAmount
-
-ON ProductValue.ProductID = SalesAmount.ProductID;
-Business Value
-Combining multiple CTEs simplifies complex calculations and helps management determine the total revenue generated by each product.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-3. Recursive CTE
-SQL Query
-WITH Numbers AS
-(
-    SELECT 1 AS Number
-
-    UNION ALL
-
-    SELECT Number + 1
-    FROM Numbers
-    WHERE Number < 10
-)
-
-SELECT *
-FROM Numbers;
-Business Value
-Recursive CTEs can generate sequences such as invoice numbers, reporting periods, or calendar dates without creating additional tables.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-4. CTE with Aggregation
-SQL Query
-WITH MonthlySales AS
-(
-    SELECT
-    MONTH(SaleDate) AS SalesMonth,
-    SUM(Quantity) AS TotalSales
-
-    FROM Sales
-
-    GROUP BY MONTH(SaleDate)
-)
-
-SELECT *
-FROM MonthlySales;
-Business Value
-Shows monthly sales totals, making it easier for management to monitor business performance over time.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-5. CTE with JOIN
-SQL Query
-WITH CustomerOrders AS
-(
-    SELECT CustomerID,
-           SUM(Quantity) AS TotalOrders
-    FROM Sales
-    GROUP BY CustomerID
-)
-
-SELECT
-Customers.CustomerName,
-CustomerOrders.TotalOrders
-
-FROM Customers
-
-JOIN CustomerOrders
-
-ON Customers.CustomerID = CustomerOrders.CustomerID;
-Business Value
-This report combines customer information with sales totals to identify customers with the highest purchase volumes.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-Part B – SQL Window Functions
-1. ROW_NUMBER()
-SELECT
-CustomerID,
-Quantity,
-
-ROW_NUMBER() OVER
-(
-ORDER BY Quantity DESC
-) AS RowNumber
-
-FROM Sales;
-Interpretation
-Assigns a unique sequential number to every sale based on quantity sold.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-2. RANK()
-SELECT
-CustomerID,
-Quantity,
-
-RANK() OVER
-(
-ORDER BY Quantity DESC
-) AS Ranking
-
-FROM Sales;
-Interpretation
-Customers with equal sales receive the same ranking while skipping the next rank.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-3. DENSE_RANK()
-SELECT
-CustomerID,
-Quantity,
-
-DENSE_RANK() OVER
-(
-ORDER BY Quantity DESC
-) AS DenseRanking
-
-FROM Sales;
-Interpretation
-Similar to RANK(), but ranking numbers remain consecutive.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-4. PERCENT_RANK()
-SELECT
-CustomerID,
-Quantity,
-
-PERCENT_RANK() OVER
-(
-ORDER BY Quantity DESC
-) AS PercentageRank
-
-FROM Sales;
-Interpretation
-Shows the percentage ranking of each customer compared to others.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-5. SUM() OVER()
-SELECT
-SaleID,
-Quantity,
-
-SUM(Quantity)
-
-OVER
-(
-ORDER BY SaleID
-)
-
-AS RunningTotal
-
-FROM Sales;
-Interpretation
-Calculates a running total of quantities sold.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-6. AVG() OVER()
-SELECT
-SaleID,
-Quantity,
-
-AVG(Quantity)
-
-OVER()
-
-AS AverageSales
-
-FROM Sales;
-Interpretation
-Displays the average sales quantity for every record.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-7. MIN() OVER()
-SELECT
-SaleID,
-Quantity,
-
-MIN(Quantity)
-
-OVER()
-
-AS MinimumSale
-
-FROM Sales;
-Interpretation
-Shows the minimum sales quantity while displaying all records.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-8. MAX() OVER()
-SELECT
-SaleID,
-Quantity,
-
-MAX(Quantity)
-
-OVER()
-
-AS MaximumSale
-
-FROM Sales;
-Interpretation
-Shows the maximum quantity sold among all sales records.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-9. LAG()
-SELECT
-SaleID,
-Quantity,
-
-LAG(Quantity)
-
-OVER
-(
-ORDER BY SaleID
-)
-
-AS PreviousSale
-
-FROM Sales;
-Interpretation
-Displays the previous sale quantity for comparison with the current sale.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-10. LEAD()
-SELECT
-SaleID,
-Quantity,
-
-LEAD(Quantity)
-
-OVER
-(
-ORDER BY SaleID
-)
-
-AS NextSale
-
-FROM Sales;
-Interpretation
-Displays the next sale quantity, making trend comparisons easier.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-11. NTILE()
-SELECT
-SaleID,
-Quantity,
-
-NTILE(4)
-
-OVER
-(
-ORDER BY Quantity DESC
-)
-
-AS Quartile
-
-FROM Sales;
-Interpretation
-Divides all sales into four performance groups.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-12. CUME_DIST()
-SELECT
-SaleID,
-Quantity,
-
-CUME_DIST()
-
-OVER
-(
-ORDER BY Quantity
-)
-
-AS Distribution
-
-FROM Sales;
-Interpretation
-Calculates the cumulative distribution of sales quantities.
-Screenshot: (Insert Screenshot Here)
-________________________________________
-Analysis and Findings
-Descriptive Analysis (What Happened?)
-The database shows that laptops generated the highest revenue among all products. Monthly sales increased steadily throughout the reporting period, and a small number of customers accounted for most purchases.
-________________________________________
-Diagnostic Analysis (Why Did It Happen?)
-The increase in sales was mainly driven by strong demand for laptops and repeat purchases from loyal customers. Customers who frequently purchased high-value products contributed significantly to total revenue.
-________________________________________
-Prescriptive Analysis (What Should Be Done?)
-•	Increase inventory for high-demand products.
-•	Introduce loyalty programs for repeat customers.
-•	Promote products with lower sales through discounts and marketing campaigns.
-•	Monitor monthly sales trends to improve inventory planning and business forecasting.
-•	Use ranking reports to reward top-performing sales representatives and identify customer purchasing patterns.
 ________________________________________
 References
 1.	Oracle SQL Documentation
@@ -470,6 +628,8 @@ References
 3.	MySQL Documentation
 4.	W3Schools SQL Tutorial
 5.	Silberschatz, Korth & Sudarshan – Database System Concepts
+6.	canva visuals
+7.	one compiler.com(pl/sql online editor and compiler)
 ________________________________________
 Academic Integrity Statement
 I declare that this assignment is my own original work. All external resources used have been properly acknowledged. I understand and agree to comply with the university's academic integrity policy. Any similarities with existing work are purely coincidental or appropriately referenced.
