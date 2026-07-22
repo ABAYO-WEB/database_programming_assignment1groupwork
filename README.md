@@ -592,7 +592,13 @@ Interpretation:
 Shows the cumulative distribution of employee sales. It helps understand how each employee compares to the overall group
 ________________________________________
 **an erd and screenshots**
-![Uploading an erd.png…]()
+
+<img width="6888" height="2039" alt="an erd" src="https://github.com/user-attachments/assets/2fe2c4b3-604b-4840-8a4b-d540813613ff" />
+
+
+
+
+
 <img width="1512" height="834" alt="io screnshot" src="https://github.com/user-attachments/assets/0bef83c6-ac92-4815-81e2-9c35582bc098" />
 
 
